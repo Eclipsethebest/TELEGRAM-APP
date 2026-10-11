@@ -42,7 +42,6 @@ def save_db(db):
     with open(KEY_DB_FILE, "w") as f:
         json.dump(db, f, indent=4)
 
-# Yardımcı Asenkron Pyrogram Fonksiyonları
 async def send_code_async(phone):
     client = Client(SESSION_NAME, api_id=API_ID, api_hash=API_HASH, in_memory=True)
     await client.connect()
@@ -56,8 +55,7 @@ async def sign_in_async(phone, phone_code_hash, code):
     await client.connect()
     try:
         await client.sign_in(phone, phone_code_hash, code)
-    except Exception as e:
-        # Şifre (2FA) gerekebilir
+    except Exception:
         pass
     me = await client.get_me()
     await client.disconnect()
@@ -90,70 +88,73 @@ HTML_TEMPLATE = """
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dreclipse Core - Real Telegram Automation</title>
     <style>
         * { box-sizing: border-box; }
-        body { background-color: #0f172a; color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
-        .container { background: #1e293b; padding: 30px 20px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); width: 100%; max-width: 420px; text-align: center; }
-        h1 { color: #38bdf8; font-size: 26px; margin-bottom: 20px; font-weight: 800; letter-spacing: 1px; }
-        p { font-size: 15px; color: #cbd5e1; margin-bottom: 15px; }
-        input, select { width: 100%; padding: 15px; margin: 10px 0; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 8px; font-size: 16px; outline: none; }
+        html, body { background-color: #0f172a; color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; height: 100vh; width: 100vw; margin: 0; padding: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+        .wrapper { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; padding: 15px; position: absolute; top: 0; left: 0; }
+        .container { background: #1e293b; padding: 25px 20px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); width: 100%; max-width: 400px; text-align: center; border: 1px solid #334155; }
+        h1 { color: #38bdf8; font-size: 24px; margin-bottom: 15px; font-weight: 800; letter-spacing: 1px; }
+        p { font-size: 14px; color: #cbd5e1; margin-bottom: 12px; }
+        input, select { width: 100%; padding: 14px; margin: 8px 0; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 8px; font-size: 15px; outline: none; }
         input:focus, select:focus { border-color: #38bdf8; }
-        button { background: #22c55e; color: white; border: none; padding: 15px; width: 100%; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 15px; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3); }
-        button:hover { background: #16a34a; transform: translateY(-2px); }
-        .start-btn { background: #eab308; font-size: 22px; padding: 22px; letter-spacing: 2px; box-shadow: 0 4px 15px rgba(234, 179, 8, 0.4); }
+        button { background: #22c55e; color: white; border: none; padding: 14px; width: 100%; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 12px; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3); }
+        button:hover { background: #16a34a; }
+        .start-btn { background: #eab308; font-size: 20px; padding: 20px; letter-spacing: 2px; box-shadow: 0 4px 15px rgba(234, 179, 8, 0.4); }
         .start-btn:hover { background: #ca8a04; }
-        .error { color: #ef4444; font-size: 14px; margin-top: 10px; background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 6px; }
-        .success { color: #22c55e; font-size: 18px; margin-bottom: 15px; font-weight: bold; }
+        .error { color: #ef4444; font-size: 13px; margin-top: 8px; background: rgba(239, 68, 68, 0.1); padding: 8px; border-radius: 6px; }
+        .success { color: #22c55e; font-size: 16px; margin-bottom: 12px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🔥 DRECLIPSE CORE 🔥</h1>
-        
-        {% if step == 'login' %}
-            <form method="POST">
-                <p>Telegram Telefon Numaranızı Girin:</p>
-                <input type="text" name="phone" placeholder="+905554443322" required>
-                <button type="submit">Telegram Kodu İste</button>
-                {% if error %}<div class="error">{{ error }}</div>{% endif %}
-            </form>
-        {% elif step == 'verify_code' %}
-            <form method="POST">
-                <p>Telegram'dan gelen giriş kodunu yazın:</p>
-                <input type="text" name="code" placeholder="12345" required>
-                <button type="submit">Hesabı Bağla</button>
-                {% if error %}<div class="error">{{ error }}</div>{% endif %}
-            </form>
-        {% elif step == 'license' %}
-            <form method="POST">
-                <p>Bağlanan: <b>{{ user_name }}</b><br>Lisans Key'inizi Girin:</p>
-                <input type="text" name="license_key" placeholder="KEY-FREE1 veya VIP Key" required>
-                <button type="submit">Lisansı Doğrula</button>
-                {% if error %}<div class="error">{{ error }}</div>{% endif %}
-            </form>
-        {% elif step == 'dashboard' %}
-            <form action="/start_action" method="GET">
-                <button type="submit" class="start-btn">▶ START</button>
-            </form>
-        {% elif step == 'chats' %}
-            <form method="POST">
-                <p>Hedef Sohbet / Grup Seç:</p>
-                <select name="chat_id" required>
-                    {% for chat in chats %}
-                        <option value="{{ chat.id }}">{{ chat.title }} ({{ chat.type }})</option>
-                    {% endfor %}
-                </select>
-                <input type="text" name="message" placeholder="Gönderilecek mesaj..." required>
-                <input type="number" name="count" placeholder="Mesaj Adedi" value="1" required>
-                <input type="number" name="delay" placeholder="Gecikme (ms)" value="2000" required>
-                <button type="submit">Gönderimi Başlat</button>
-            </form>
-        {% elif step == 'success_done' %}
-            <div class="success">🚀 Mesajlar Gerçek Olarak Gönderildi!</div>
-            <a href="/start_action" style="text-decoration: none;"><button>Yeni İşlem Yap</button></a>
-        {% endif %}
+    <div class="wrapper">
+        <div class="container">
+            <h1>🔥 DRECLIPSE CORE 🔥</h1>
+            
+            {% if step == 'login' %}
+                <form method="POST">
+                    <p>Telegram Telefon Numaranızı Girin:</p>
+                    <input type="text" name="phone" placeholder="+905554443322" required>
+                    <button type="submit">Telegram Kodu İste</button>
+                    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+                </form>
+            {% elif step == 'verify_code' %}
+                <form method="POST">
+                    <p>Telegram'dan gelen giriş kodunu yazın:</p>
+                    <input type="text" name="code" placeholder="12345" required>
+                    <button type="submit">Hesabı Bağla</button>
+                    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+                </form>
+            {% elif step == 'license' %}
+                <form method="POST">
+                    <p>Bağlanan: <b>{{ user_name }}</b><br>Lisans Key'inizi Girin:</p>
+                    <input type="text" name="license_key" placeholder="KEY-FREE1 veya VIP Key" required>
+                    <button type="submit">Lisansı Doğrula</button>
+                    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+                </form>
+            {% elif step == 'dashboard' %}
+                <form action="/start_action" method="GET">
+                    <button type="submit" class="start-btn">▶ START</button>
+                </form>
+            {% elif step == 'chats' %}
+                <form method="POST">
+                    <p>Hedef Sohbet / Grup Seç:</p>
+                    <select name="chat_id" required>
+                        {% for chat in chats %}
+                            <option value="{{ chat.id }}">{{ chat.title }} ({{ chat.type }})</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="message" placeholder="Gönderilecek mesaj..." required>
+                    <input type="number" name="count" placeholder="Mesaj Adedi" value="1" required>
+                    <input type="number" name="delay" placeholder="Gecikme (ms)" value="2000" required>
+                    <button type="submit">Gönderimi Başlat</button>
+                </form>
+            {% elif step == 'success_done' %}
+                <div class="success">🚀 Mesajlar Gerçek Olarak Gönderildi!</div>
+                <a href="/start_action" style="text-decoration: none;"><button>Yeni İşlem Yap</button></a>
+            {% endif %}
+        </div>
     </div>
 </body>
 </html>
