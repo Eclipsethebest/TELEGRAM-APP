@@ -2,11 +2,16 @@ import os
 import json
 import asyncio
 from flask import Flask, render_template_string, request, redirect, url_for, session
+from pyrogram import Client
 
 app = Flask(__name__)
 app.secret_key = "dreclipse_super_secret_web_key_2026"
 
 KEY_DB_FILE = "used_keys_db.json"
+SESSION_NAME = "dreclipse_web_session"
+
+API_ID = 2040
+API_HASH = "b18445a39ef28e3383821282b93f6b53"
 
 MONTHLY_KEYS = [
     "DRC-1M-9X87-QW21-4PLK", "DRC-1M-3K90-ZX84-7MNB", "DRC-1M-5Y61-PO99-2VCX",
@@ -37,13 +42,56 @@ def save_db(db):
     with open(KEY_DB_FILE, "w") as f:
         json.dump(db, f, indent=4)
 
+# Yardımcı Asenkron Pyrogram Fonksiyonları
+async def send_code_async(phone):
+    client = Client(SESSION_NAME, api_id=API_ID, api_hash=API_HASH, in_memory=True)
+    await client.connect()
+    sent_code = await client.send_code(phone)
+    phone_code_hash = sent_code.phone_code_hash
+    await client.disconnect()
+    return phone_code_hash
+
+async def sign_in_async(phone, phone_code_hash, code):
+    client = Client(SESSION_NAME, api_id=API_ID, api_hash=API_HASH)
+    await client.connect()
+    try:
+        await client.sign_in(phone, phone_code_hash, code)
+    except Exception as e:
+        # Şifre (2FA) gerekebilir
+        pass
+    me = await client.get_me()
+    await client.disconnect()
+    return me.id, me.first_name
+
+async def fetch_dialogs_async():
+    client = Client(SESSION_NAME, api_id=API_ID, api_hash=API_HASH)
+    await client.connect()
+    dialogs = []
+    async for dialog in client.get_dialogs():
+        dialogs.append({
+            "id": dialog.chat.id,
+            "title": dialog.chat.title or dialog.chat.first_name or "İsimsiz Sohbet",
+            "type": str(dialog.chat.type.value)
+        })
+    await client.disconnect()
+    return dialogs
+
+async def send_messages_async(chat_id, message, count, delay_ms):
+    client = Client(SESSION_NAME, api_id=API_ID, api_hash=API_HASH)
+    await client.connect()
+    delay_sec = delay_ms / 1000.0
+    for _ in range(count):
+        await client.send_message(chat_id, message)
+        await asyncio.sleep(delay_sec)
+    await client.disconnect()
+
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dreclipse Core - Telegram Automation</title>
+    <title>Dreclipse Core - Real Telegram Automation</title>
     <style>
         * { box-sizing: border-box; }
         body { background-color: #0f172a; color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
@@ -68,12 +116,19 @@ HTML_TEMPLATE = """
             <form method="POST">
                 <p>Telegram Telefon Numaranızı Girin:</p>
                 <input type="text" name="phone" placeholder="+905554443322" required>
-                <button type="submit">Devam Et</button>
+                <button type="submit">Telegram Kodu İste</button>
+                {% if error %}<div class="error">{{ error }}</div>{% endif %}
+            </form>
+        {% elif step == 'verify_code' %}
+            <form method="POST">
+                <p>Telegram'dan gelen giriş kodunu yazın:</p>
+                <input type="text" name="code" placeholder="12345" required>
+                <button type="submit">Hesabı Bağla</button>
                 {% if error %}<div class="error">{{ error }}</div>{% endif %}
             </form>
         {% elif step == 'license' %}
             <form method="POST">
-                <p>Hoş geldiniz! Lisans Key'inizi Girin:</p>
+                <p>Bağlanan: <b>{{ user_name }}</b><br>Lisans Key'inizi Girin:</p>
                 <input type="text" name="license_key" placeholder="KEY-FREE1 veya VIP Key" required>
                 <button type="submit">Lisansı Doğrula</button>
                 {% if error %}<div class="error">{{ error }}</div>{% endif %}
@@ -84,17 +139,19 @@ HTML_TEMPLATE = """
             </form>
         {% elif step == 'chats' %}
             <form method="POST">
-                <p>Hedef Seç ve Mesaj Yaz:</p>
-                <select name="chat_target" required>
-                    <option value="12345">Örnek Grup / Kanal 1</option>
-                    <option value="67890">Örnek Grup / Kanal 2</option>
+                <p>Hedef Sohbet / Grup Seç:</p>
+                <select name="chat_id" required>
+                    {% for chat in chats %}
+                        <option value="{{ chat.id }}">{{ chat.title }} ({{ chat.type }})</option>
+                    {% endfor %}
                 </select>
                 <input type="text" name="message" placeholder="Gönderilecek mesaj..." required>
                 <input type="number" name="count" placeholder="Mesaj Adedi" value="1" required>
+                <input type="number" name="delay" placeholder="Gecikme (ms)" value="2000" required>
                 <button type="submit">Gönderimi Başlat</button>
             </form>
         {% elif step == 'success_done' %}
-            <div class="success">✅ İşlem Başarıyla Tamamlandı!</div>
+            <div class="success">🚀 Mesajlar Gerçek Olarak Gönderildi!</div>
             <a href="/start_action" style="text-decoration: none;"><button>Yeni İşlem Yap</button></a>
         {% endif %}
     </div>
@@ -106,53 +163,89 @@ HTML_TEMPLATE = """
 def index():
     step = session.get("step", "login")
     error = None
+    user_name = session.get("user_name", "")
 
     if request.method == "POST":
         if step == "login":
-            phone = request.form.get("phone")
+            phone = request.form.get("phone").strip()
             if phone:
-                session["phone"] = phone
-                session["step"] = "license"
-                return redirect(url_for("index"))
+                try:
+                    hash_code = asyncio.run(send_code_async(phone))
+                    session["phone"] = phone
+                    session["phone_code_hash"] = hash_code
+                    session["step"] = "verify_code"
+                    return redirect(url_for("index"))
+                except Exception as e:
+                    error = f"Hata: {str(e)}"
             else:
                 error = "Geçerli bir telefon numarası girin!"
+
+        elif step == "verify_code":
+            code = request.form.get("code").strip()
+            phone = session.get("phone")
+            phone_code_hash = session.get("phone_code_hash")
+            try:
+                uid, name = asyncio.run(sign_in_async(phone, phone_code_hash, code))
+                session["user_id"] = str(uid)
+                session["user_name"] = name
+                session["step"] = "license"
+                return redirect(url_for("index"))
+            except Exception as e:
+                error = f"Kod Hatalı: {str(e)}"
 
         elif step == "license":
             lkey = request.form.get("license_key").strip()
             db = load_db()
-            phone = session.get("phone", "unknown_user")
+            user_id = session.get("user_id")
             
             if lkey == "KEY-FREE1":
                 free_users = db.get("FREE_USERS", [])
-                if phone in free_users:
+                if user_id in free_users:
                     error = "Bu hesap için deneme hakkı kullanıldı!"
                 else:
-                    free_users.append(phone)
+                    free_users.append(user_id)
                     db["FREE_USERS"] = free_users
                     save_db(db)
                     session["step"] = "dashboard"
                     return redirect(url_for("index"))
             elif lkey in MONTHLY_KEYS or lkey in LIFETIME_KEYS:
                 if lkey in db:
-                    error = "Bu key başka bir kullanıcı tarafından kullanılmış!"
+                    if db[lkey] == user_id:
+                        session["step"] = "dashboard"
+                        return redirect(url_for("index"))
+                    else:
+                        error = "Bu key başka bir hesaba mühürlenmiş!"
                 else:
-                    db[lkey] = phone
+                    db[lkey] = user_id
                     save_db(db)
                     session["step"] = "dashboard"
                     return redirect(url_for("index"))
             else:
-                error = "Geçersiz veya hatalı key!"
+                error = "Geçersiz key!"
 
-    return render_template_string(HTML_TEMPLATE, step=step, error=error)
+    return render_template_string(HTML_TEMPLATE, step=step, error=error, user_name=user_name)
 
 @app.route("/start_action", methods=["GET", "POST"])
 def start_action():
     if request.method == "POST":
-        session["step"] = "success_done"
-        return redirect(url_for("start_action"))
+        chat_id = int(request.form.get("chat_id"))
+        message = request.form.get("message")
+        count = int(request.form.get("count"))
+        delay = int(request.form.get("delay"))
+        
+        try:
+            asyncio.run(send_messages_async(chat_id, message, count, delay))
+            session["step"] = "success_done"
+            return redirect(url_for("start_action"))
+        except Exception as e:
+            return f"Gönderim Hatası: {e}"
     
-    session["step"] = "chats"
-    return render_template_string(HTML_TEMPLATE, step="chats")
+    try:
+        chats = asyncio.run(fetch_dialogs_async())
+        session["step"] = "chats"
+        return render_template_string(HTML_TEMPLATE, step="chats", chats=chats)
+    except Exception as e:
+        return f"Sohbetler yüklenemedi: {e}"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
