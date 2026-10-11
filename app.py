@@ -42,18 +42,22 @@ HTML_TEMPLATE = """
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dreclipse Core - Telegram Automation</title>
     <style>
-        body { background-color: #0f172a; color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .container { background: #1e293b; padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); width: 400px; text-align: center; }
-        h1 { color: #38bdf8; font-size: 24px; margin-bottom: 20px; }
-        input, select { width: 100%; padding: 12px; margin: 10px 0; background: #334155; border: 1px solid #475569; color: white; border-radius: 6px; box-sizing: border-box; }
-        button { background: #22c55e; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 10px; }
+        * { box-sizing: border-box; }
+        body { background-color: #0f172a; color: #f8fafc; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .container { background: #1e293b; padding: 30px 20px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); width: 100%; max-width: 420px; text-align: center; }
+        h1 { color: #38bdf8; font-size: 26px; margin-bottom: 20px; font-weight: 800; letter-spacing: 1px; }
+        p { font-size: 15px; color: #cbd5e1; margin-bottom: 15px; }
+        input, select { width: 100%; padding: 15px; margin: 10px 0; background: #0f172a; border: 1px solid #475569; color: white; border-radius: 8px; font-size: 16px; outline: none; }
+        input:focus, select:focus { border-color: #38bdf8; }
+        button { background: #22c55e; color: white; border: none; padding: 15px; width: 100%; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; margin-top: 15px; box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3); }
         button:hover { background: #16a34a; transform: translateY(-2px); }
-        .start-btn { background: #eab308; font-size: 20px; padding: 20px; letter-spacing: 2px; }
+        .start-btn { background: #eab308; font-size: 22px; padding: 22px; letter-spacing: 2px; box-shadow: 0 4px 15px rgba(234, 179, 8, 0.4); }
         .start-btn:hover { background: #ca8a04; }
-        .error { color: #ef4444; font-size: 14px; margin-top: 10px; }
-        .success { color: #22c55e; font-size: 14px; margin-top: 10px; }
+        .error { color: #ef4444; font-size: 14px; margin-top: 10px; background: rgba(239, 68, 68, 0.1); padding: 10px; border-radius: 6px; }
+        .success { color: #22c55e; font-size: 18px; margin-bottom: 15px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -90,8 +94,8 @@ HTML_TEMPLATE = """
                 <button type="submit">Gönderimi Başlat</button>
             </form>
         {% elif step == 'success_done' %}
-            <h3 class="success">✅ İşlem Başarıyla Tamamlandı!</h3>
-            <a href="/start_action"><button>Yeni İşlem Yap</button></a>
+            <div class="success">✅ İşlem Başarıyla Tamamlandı!</div>
+            <a href="/start_action" style="text-decoration: none;"><button>Yeni İşlem Yap</button></a>
         {% endif %}
     </div>
 </body>
